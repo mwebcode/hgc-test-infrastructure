@@ -1,7 +1,14 @@
 import json
 from typing import Dict, Any
+from decimal import Decimal
 
 from ..utils.dynamodb import DynamoDBClient
+
+
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -131,7 +138,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {
             'statusCode': 200,
             'headers': headers,
-            'body': json.dumps(response_data)
+            'body': json.dumps(response_data, default=decimal_default)
         }
         
     except Exception as e:
