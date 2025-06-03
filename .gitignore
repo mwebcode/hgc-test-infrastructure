@@ -5,6 +5,7 @@ __pycache__/
 .env
 .venv/
 *.txt
+!requirements.txt
 github-actions-creds-*.txt
 .DS_Store
 *.log
