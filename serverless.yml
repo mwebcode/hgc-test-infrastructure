@@ -16,6 +16,10 @@ provider:
     S3_BUCKET: !Ref TestResultsBucket
     DYNAMODB_TABLE: !Ref TestRunsTable
     GITHUB_TOKEN: ${ssm:/hgc-frontend-tests/${self:provider.stage}/github-token}
+  apiGateway:
+    apiKeys:
+      - name: hgc-frontend-tests-${self:provider.stage}
+        description: API key for HGC frontend test automation
   iam:
     role:
       statements:
@@ -53,6 +57,7 @@ functions:
       - http:
           path: /trigger-tests
           method: post
+          private: true
           cors:
             origin: '*'
             headers:
@@ -70,6 +75,7 @@ functions:
       - http:
           path: /results/{runId}
           method: get
+          private: true
           cors:
             origin: '*'
             headers:
@@ -87,6 +93,7 @@ functions:
       - http:
           path: /runs
           method: get
+          private: true
           cors:
             origin: '*'
             headers:
@@ -183,6 +190,14 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
 
+    ApiKeyParameter:
+      Type: AWS::SSM::Parameter
+      Properties:
+        Name: /hgc-frontend-tests/${self:provider.stage}/api-key
+        Description: API key for HGC frontend test automation
+        Type: String
+        Value: !Ref ApiGatewayApiKey1
+
   Outputs:
     S3BucketName:
       Description: S3 Bucket for test results
@@ -195,6 +210,12 @@ resources:
       Value: !Ref TestRunsTable
       Export:
         Name: ${self:service}-${self:provider.stage}-dynamodb-table
+    
+    ApiKeyId:
+      Description: API Gateway API Key ID
+      Value: !Ref ApiGatewayApiKey1
+      Export:
+        Name: ${self:service}-${self:provider.stage}-api-key-id
 
 plugins:
   - serverless-python-requirements
