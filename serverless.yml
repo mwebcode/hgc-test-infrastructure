@@ -17,9 +17,11 @@ provider:
     DYNAMODB_TABLE: !Ref TestRunsTable
     GITHUB_TOKEN: ${ssm:/hgc-frontend-tests/${self:provider.stage}/github-token}
   apiGateway:
+    shouldStartNameWithService: true
     apiKeys:
-      - name: hgc-frontend-tests-${self:provider.stage}
-        description: API key for HGC frontend test automation
+      - ${self:service}_${self:provider.stage}
+    binaryMediaTypes:
+      - '*/*'
   iam:
     role:
       statements:
@@ -51,79 +53,14 @@ provider:
             - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/hgc-frontend-tests/${self:provider.stage}/*"
 
 functions:
-  triggerTests:
-    handler: src.handlers.trigger_tests.handler
+  api:
+    handler: src.handler.handler
+    timeout: 29 # max number of seconds for API GW
     events:
-      - http:
-          path: /trigger-tests
-          method: post
+      - http: 
+          method: ANY
+          path: /{proxy+}
           private: true
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: false
-
-  getResults:
-    handler: src.handlers.get_results.handler
-    events:
-      - http:
-          path: /results/{runId}
-          method: get
-          private: true
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: false
-
-  listRuns:
-    handler: src.handlers.list_runs.handler
-    events:
-      - http:
-          path: /runs
-          method: get
-          private: true
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: false
-
-  webhook:
-    handler: src.handlers.webhook.handler
-    events:
-      - http:
-          path: /webhook
-          method: post
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - X-GitHub-Event
-              - X-GitHub-Delivery
-              - X-Hub-Signature-256
-            allowCredentials: false
 
 resources:
   Resources:
