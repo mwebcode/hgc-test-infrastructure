@@ -1,0 +1,20 @@
+{
+  "name": "hgc-test-infrastructure",
+  "version": "1.0.0",
+  "description": "Infrastructure for HGC frontend tests",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:dev": "serverless deploy --stage dev",
+    "deploy:prod": "serverless deploy --stage prod",
+    "remove": "serverless remove",
+    "info": "serverless info"
+  },
+  "keywords": ["serverless", "aws", "testing", "infrastructure"],
+  "author": "HGC",
+  "license": "ISC",
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-python-requirements": "^6.0.0"
+  }
+}

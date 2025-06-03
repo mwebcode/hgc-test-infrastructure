@@ -1,0 +1,206 @@
+service: hgc-frontend-tests-infra
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: af-south-1
+  stage: ${opt:stage, 'dev'}
+  profile: mweb
+  timeout: 30
+  memorySize: 256
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    S3_BUCKET: !Ref TestResultsBucket
+    DYNAMODB_TABLE: !Ref TestRunsTable
+    GITHUB_TOKEN: ${ssm:/hgc-frontend-tests/${self:provider.stage}/github-token}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource:
+            - "arn:aws:s3:::hgc-test-results-${self:provider.stage}"
+            - "arn:aws:s3:::hgc-test-results-${self:provider.stage}/*"
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - !GetAtt TestRunsTable.Arn
+            - !Sub "${TestRunsTable.Arn}/index/*"
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+          Resource:
+            - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/hgc-frontend-tests/${self:provider.stage}/*"
+
+functions:
+  triggerTests:
+    handler: src.handlers.trigger_tests.handler
+    events:
+      - http:
+          path: /trigger-tests
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+
+  getResults:
+    handler: src.handlers.get_results.handler
+    events:
+      - http:
+          path: /results/{runId}
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+
+  listRuns:
+    handler: src.handlers.list_runs.handler
+    events:
+      - http:
+          path: /runs
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+
+  webhook:
+    handler: src.handlers.webhook.handler
+    events:
+      - http:
+          path: /webhook
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - X-GitHub-Event
+              - X-GitHub-Delivery
+              - X-Hub-Signature-256
+            allowCredentials: false
+
+resources:
+  Resources:
+    TestResultsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: hgc-test-results-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteAfter90Days
+              Status: Enabled
+              ExpirationInDays: 90
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - HEAD
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3000
+
+    TestRunsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: hgc-test-runs-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: gsi1pk
+            AttributeType: S
+          - AttributeName: gsi1sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: gsi1pk
+                KeyType: HASH
+              - AttributeName: gsi1sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+  Outputs:
+    S3BucketName:
+      Description: S3 Bucket for test results
+      Value: !Ref TestResultsBucket
+      Export:
+        Name: ${self:service}-${self:provider.stage}-s3-bucket
+    
+    DynamoDBTableName:
+      Description: DynamoDB table for test runs
+      Value: !Ref TestRunsTable
+      Export:
+        Name: ${self:service}-${self:provider.stage}-dynamodb-table
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    strip: false
