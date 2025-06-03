@@ -8,7 +8,10 @@
     "deploy:dev": "serverless deploy --stage dev",
     "deploy:prod": "serverless deploy --stage prod",
     "remove": "serverless remove",
-    "info": "serverless info"
+    "info": "serverless info",
+    "test": "pytest tests/ -v",
+    "test:watch": "pytest tests/ -v --watch",
+    "test:coverage": "pytest tests/ --cov=src --cov-report=html --cov-report=term-missing"
   },
   "keywords": ["serverless", "aws", "testing", "infrastructure"],
   "author": "HGC",
