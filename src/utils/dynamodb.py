@@ -86,27 +86,27 @@ class DynamoDBClient:
         List test runs with optional filtering
         """
         try:
-            base_kwargs = {
+            # Base query parameters
+            query_kwargs = {
                 'Limit': limit
             }
             
             if last_evaluated_key:
-                base_kwargs['ExclusiveStartKey'] = last_evaluated_key
+                query_kwargs['ExclusiveStartKey'] = last_evaluated_key
             
+            # Determine which query strategy to use
             if status:
                 # Use GSI1 to query by status
-                query_kwargs = base_kwargs.copy()
                 query_kwargs.update({
                     'IndexName': 'GSI1',
                     'KeyConditionExpression': 'gsi1pk = :gsi1pk',
                     'ExpressionAttributeValues': {
                         ':gsi1pk': f'STATUS#{status}'
-                    },
-                    'ScanIndexForward': False  # Sort by timestamp descending
+                    }
                 })
                 
+                # Add timestamp range condition if provided
                 if start_date or end_date:
-                    # Add timestamp range condition
                     if start_date and end_date:
                         query_kwargs['KeyConditionExpression'] += ' AND gsi1sk BETWEEN :start_ts AND :end_ts'
                         query_kwargs['ExpressionAttributeValues'].update({
@@ -120,39 +120,36 @@ class DynamoDBClient:
                         query_kwargs['KeyConditionExpression'] += ' AND gsi1sk <= :end_ts'
                         query_kwargs['ExpressionAttributeValues'][':end_ts'] = f'TIMESTAMP#{end_date}'
                 
-                response = self.table.query(**query_kwargs)
-            
             elif brand:
-                # Query by brand
-                query_kwargs = base_kwargs.copy()
+                # Query by brand using primary key
                 query_kwargs.update({
                     'KeyConditionExpression': 'pk = :pk',
                     'ExpressionAttributeValues': {
                         ':pk': f'BRAND#{brand}'
-                    },
-                    'ScanIndexForward': False  # Sort by timestamp descending
+                    }
                 })
                 
-                response = self.table.query(**query_kwargs)
             else:
-                # Default to querying mweb brand when no filters provided
-                # This avoids expensive scans and encourages proper API usage
-                query_kwargs = base_kwargs.copy()
+                # Default to querying mweb brand to avoid expensive scans
                 query_kwargs.update({
                     'KeyConditionExpression': 'pk = :pk',
                     'ExpressionAttributeValues': {
-                        ':pk': 'BRAND#mweb'  # Default to mweb brand
-                    },
-                    'ScanIndexForward': False  # Sort by timestamp descending
+                        ':pk': 'BRAND#mweb'
+                    }
                 })
-                
-                response = self.table.query(**query_kwargs)
             
-            # Filter by brand if status was used but brand is also specified
+            # Execute the query
+            response = self.table.query(**query_kwargs)
+            
+            # Filter by brand if both status and brand were specified
             items = response['Items']
             if status and brand:
                 items = [item for item in items if item.get('brand') == brand]
             
+            # Sort by timestamp descending (most recent first)
+            items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+            # Build result
             result = {
                 'items': items,
                 'count': len(items)

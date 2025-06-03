@@ -9,7 +9,7 @@ def mock_env_vars():
     """Mock environment variables for testing"""
     test_env = {
         'STAGE': 'test',
-        'REGION': 'us-east-1',
+        'REGION': 'af-south-1',
         'S3_BUCKET': 'test-bucket',
         'DYNAMODB_TABLE': 'test-table',
         'GITHUB_TOKEN': 'test-token'
@@ -35,8 +35,12 @@ def mock_env_vars():
 def mock_dynamodb_resource(mock_env_vars):
     """Create a mock DynamoDB resource for testing"""
     with mock_dynamodb():
-        dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+        # Set region in environment for boto3
+        os.environ['AWS_DEFAULT_REGION'] = 'af-south-1'
         
+        dynamodb = boto3.resource('dynamodb', region_name='af-south-1')
+        
+        # Create the table
         table = dynamodb.create_table(
             TableName='test-table',
             KeySchema=[
@@ -82,11 +86,21 @@ def mock_dynamodb_resource(mock_env_vars):
                     ],
                     'Projection': {
                         'ProjectionType': 'ALL'
+                    },
+                    'ProvisionedThroughput': {
+                        'ReadCapacityUnits': 5,
+                        'WriteCapacityUnits': 5
                     }
                 }
             ],
-            BillingMode='PAY_PER_REQUEST'
+            ProvisionedThroughput={
+                'ReadCapacityUnits': 5,
+                'WriteCapacityUnits': 5
+            }
         )
+        
+        # Wait for table to be active (in mock this is immediate)
+        table.meta.client.get_waiter('table_exists').wait(TableName='test-table')
         
         yield dynamodb
 
@@ -95,7 +109,10 @@ def mock_dynamodb_resource(mock_env_vars):
 def s3_bucket(mock_env_vars):
     """Create a mock S3 bucket for testing"""
     with mock_s3():
-        s3 = boto3.client('s3', region_name='us-east-1')
+        # Set region in environment for boto3
+        os.environ['AWS_DEFAULT_REGION'] = 'af-south-1'
+        
+        s3 = boto3.client('s3', region_name='af-south-1')
         s3.create_bucket(Bucket='test-bucket')
         yield s3
 
@@ -104,7 +121,7 @@ def s3_bucket(mock_env_vars):
 def ssm_client(mock_env_vars):
     """Create a mock SSM client for testing"""
     with mock_ssm():
-        ssm = boto3.client('ssm', region_name='us-east-1')
+        ssm = boto3.client('ssm', region_name='af-south-1')
         
         # Add test parameters
         ssm.put_parameter(

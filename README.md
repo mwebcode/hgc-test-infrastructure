@@ -53,6 +53,7 @@ npm run deploy:dev
 
 ## Testing
 
+### Unit Tests
 ```bash
 # Install test dependencies
 pip install -r requirements.txt
@@ -66,6 +67,50 @@ pytest tests/utils/test_github.py -v
 # Run with coverage
 npm run test:coverage
 ```
+
+### Integration Tests
+
+Integration tests verify the deployed API endpoints work correctly and can catch issues like DynamoDB parameter errors.
+
+```bash
+# Run integration tests using environment variables
+export HGC_API_URL_DEV="https://your-api-gateway-url/dev"
+export HGC_API_KEY_DEV="your-dev-api-key"
+./scripts/run-integration-tests.sh dev
+
+# Run integration tests with explicit parameters
+./scripts/run-integration-tests.sh dev https://api.example.com your-api-key
+
+# Run in interactive mode
+./scripts/run-integration-tests.sh
+
+# Run via pytest (requires environment variables)
+pytest tests/test_integration.py::test_dev_environment -v
+```
+
+#### GitHub Actions Integration Tests
+
+Integration tests run automatically:
+- **On every push/PR**: Tests dev environment
+- **Every 6 hours**: Scheduled health check  
+- **Manual trigger**: Can test dev or prod environment
+- **Post-deployment**: Smoke tests after deployment
+
+Required GitHub secrets:
+- `HGC_API_URL_DEV` - Dev environment API URL
+- `HGC_API_KEY_DEV` - Dev environment API key  
+- `HGC_API_URL_PROD` - Prod environment API URL
+- `HGC_API_KEY_PROD` - Prod environment API key
+
+#### What Integration Tests Catch
+
+- **DynamoDB parameter errors** (like the ScanIndexForward issue)
+- **API Gateway configuration issues**
+- **IAM permission problems**  
+- **Missing environment variables**
+- **CORS header configuration**
+- **API key authentication**
+- **Response format validation**
 
 ## Configuration
 
